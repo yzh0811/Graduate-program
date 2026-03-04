@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ app_name }} - AI基金经理工作台</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="header">
+        <div>
+          <h1>{{ app_name }}</h1>
+          <p class="sub">AI基金经理工作台：周度决策（周一开盘买入 / 周五收盘结算）→ 组合推荐 → 周度回测与基准ETF对比</p>
+        </div>
+      </header>
+
+      <section class="card">
+        <h2>📋 任务配置（单周）</h2>
+        <div class="grid" style="grid-template-columns: repeat(5, minmax(0, 1fr));">
+          <label>
+            <span>选择任意日期（系统自动识别交易周）</span>
+            <input id="asOf" type="date" />
+          </label>
+          <label>
+            <span>候选数量 top_k</span>
+            <input id="topK" type="number" min="5" max="500" value="10" />
+          </label>
+          <label>
+            <span>最小持仓 min_holdings</span>
+            <input id="minHoldings" type="number" min="5" max="30" value="5" />
+          </label>
+          <label>
+            <span>模型标签 model_tag</span>
+            <select id="modelTag">
+              <option value="primary" selected>primary</option>
+              <option value="secondary">secondary</option>
+            </select>
+          </label>
+          <label>
+            <span>模型提供商 provider（可选）</span>
+            <select id="provider">
+              <option value="" selected>默认（来自 .env）</option>
+              <option value="openai_compatible">openai_compatible</option>
+              <option value="qwen">qwen</option>
+              <option value="kimi">kimi</option>
+              <option value="n1n">n1n</option>
+              <option value="ollama">ollama</option>
+              <option value="mock">mock</option>
+            </select>
+          </label>
+          <label>
+            <span>模型名称 model_name（可选）</span>
+            <input id="modelName" type="text" placeholder="例如：deepseek-chat" value="deepseek-chat" />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="runAgentBtn">运行AI周基金经理（单周）</button>
+          <span id="agentStatus" class="status"></span>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>📈 AI基金经理输出</h2>
+        <div id="agentResult" class="hidden">
+          <div class="tabs">
+            <button class="tab-btn active" data-tab="timeline">决策时间线</button>
+            <button class="tab-btn" data-tab="portfolio">组合详情</button>
+            <button class="tab-btn" data-tab="report">完整报告</button>
+          </div>
+
+          <div id="timeline" class="tab-content active">
+            <ul id="timelineList" class="timeline-list"></ul>
+          </div>
+
+          <div id="portfolio" class="tab-content">
+            <table id="portfolioTable" class="portfolio-table">
+              <thead>
+                <tr>
+                  <th>代码</th>
+                  <th>名称</th>
+                  <th>权重</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <div id="report" class="tab-content">
+            <pre id="reportPre" class="pre"></pre>
+          </div>
+        </div>
+        <div id="agentEmpty" class="empty-state">
+          <p>点击上方「运行AI周基金经理（单周）」查看结果</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>📊 周度回测与基准ETF对比</h2>
+        <div class="grid" style="grid-template-columns: repeat(4, minmax(0, 1fr));">
+          <label>
+            <span>开始日期（YYYY-MM-DD）</span>
+            <input id="wbtStart" type="date" />
+          </label>
+          <label>
+            <span>结束日期（YYYY-MM-DD）</span>
+            <input id="wbtEnd" type="date" />
+          </label>
+          <label>
+            <span>基准ETF代码</span>
+            <input id="wbtBenchmark" type="text" value="sh.510300" />
+          </label>
+          <label>
+            <span>模型标签 model_tag</span>
+            <select id="wbtModelTag">
+              <option value="primary" selected>primary</option>
+              <option value="secondary">secondary</option>
+            </select>
+          </label>
+        </div>
+        <div class="actions">
+          <button id="runWeeklyBacktestBtn">📈 开始周度回测（AI vs 基准ETF）</button>
+          <span id="wbtStatus" class="status"></span>
+        </div>
+
+        <div id="weeklyBacktestResult" class="hidden">
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-label">AI累计收益</div>
+              <div id="aiCumulative" class="metric-value">-</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">基准累计收益</div>
+              <div id="benchCumulative" class="metric-value">-</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">超额累计收益</div>
+              <div id="excessCumulative" class="metric-value">-</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">信息比率(IR)</div>
+              <div id="infoRatio" class="metric-value">-</div>
+            </div>
+          </div>
+
+          <div class="metrics-grid" style="margin-top: 10px;">
+            <div class="metric-card">
+              <div class="metric-label">AI年化收益</div>
+              <div id="aiAnnual" class="metric-value">-</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">AI最大回撤</div>
+              <div id="aiMaxDD" class="metric-value">-</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">基准年化收益</div>
+              <div id="benchAnnual" class="metric-value">-</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">基准最大回撤</div>
+              <div id="benchMaxDD" class="metric-value">-</div>
+            </div>
+          </div>
+
+          <div class="chart-container" style="margin-top: 16px;">
+            <canvas id="weeklyNavChart" width="800" height="400"></canvas>
+          </div>
+        </div>
+        <div id="weeklyBacktestEmpty" class="empty-state">
+          <p>配置日期范围后点击「开始周度回测」查看 AI 与基准ETF 的净值对比</p>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <span>API: <code>/api/agent/run</code> / <code>/api/backtest/weekly</code> / <code>/api/backtest/run</code></span>
+      </footer>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
