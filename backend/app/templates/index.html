@@ -19,16 +19,16 @@
         <h2>📋 任务配置（单周）</h2>
         <div class="grid" style="grid-template-columns: repeat(5, minmax(0, 1fr));">
           <label>
-            <span>选择任意日期（系统自动识别交易周）</span>
-            <input id="asOf" type="date" />
+            <span>选择周（系统自动识别该周交易区间）</span>
+            <input id="asOfWeek" type="week" />
           </label>
           <label>
             <span>候选数量 top_k</span>
             <input id="topK" type="number" min="5" max="500" value="10" />
           </label>
           <label>
-            <span>最小持仓 min_holdings</span>
-            <input id="minHoldings" type="number" min="5" max="30" value="5" />
+            <span>最小持仓 min_holdings（固定为10）</span>
+            <input id="minHoldings" type="number" min="10" max="10" value="10" disabled />
           </label>
           <label>
             <span>模型标签 model_tag</span>

@@ -41,10 +41,15 @@ class AgentState(TypedDict, total=False):
 
 def _node_fetch_data(state: AgentState) -> AgentState:
     snap = get_market_snapshot(state["as_of"], top_k=state["top_k"])
+    target_date = state.get("target_date", "")
+    week_start = state.get("week_start", "")
+    week_end = state.get("week_end", "")
+    week_line = f"周度区间：{week_start} ~ {week_end}" if week_start and week_end else ""
     return {
         "market_summary": (
             snap.summary_text
-            + f"\n预测目标日：{state.get('target_date','')}"
+            + (f"\n预测目标日：{target_date}" if target_date else "")
+            + (f"\n{week_line}" if week_line else "")
         ),
         "universe": snap.universe,
     }
@@ -117,7 +122,7 @@ def _safe_parse_json_list(text: str) -> list[dict]:
 
 def _node_select(state: AgentState) -> AgentState:
     universe = state.get("universe") or []
-    min_holdings = int(state.get("min_holdings", 5))
+    min_holdings = 10
 
     # 给选股阶段前置真实的近20日指标，让模型必须“看实际”而不是讲故事
     enriched_universe = enrich_selected_with_metrics(
@@ -183,8 +188,9 @@ def _node_select(state: AgentState) -> AgentState:
             vol = m.get("volatility_20d") or 0.0
             
             # 简单线性打分 (实际应做 rank 归一化，这里做简化处理)
-            score = ret * 10.0 + (1.0 + dd) * 5.0 + (amt / 1e9) * 2.0
-            if vol > 0.8: # 允许高波动，但排除极端波动
+            # 成交额仅做辅助，降低其权重
+            score = ret * 12.0 + (1.0 + dd) * 6.0 + (amt / 1e9) * 0.5
+            if vol > 0.8: # 允许高波动，但排除极端高波动
                 score -= 5.0
             return score
 
@@ -277,7 +283,7 @@ def _normalize_and_clip_weights(
 
 
 def _node_weight(state: AgentState) -> AgentState:
-    min_holdings = int(state.get("min_holdings", 5))
+    min_holdings = 10
     selected = state.get("selected") or []
     selected = selected[: max(min_holdings, 5)]
 
@@ -420,6 +426,8 @@ def run_portfolio_agent(req: RunAgentRequest | None = None, /, **kwargs: Any) ->
         init: AgentState = {
             "as_of": as_of,
             "target_date": week_date,
+            "week_start": week_start,
+            "week_end": week_end,
             "top_k": req.top_k,
             "min_holdings": req.min_holdings,
             "model_tag": req.model_tag,

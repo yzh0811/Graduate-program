@@ -6,6 +6,28 @@ function toJsonPretty(obj) {
   return JSON.stringify(obj, null, 2);
 }
 
+function getISOWeekString(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+}
+
+function weekToDate(weekStr) {
+  const match = /^(\d{4})-W(\d{2})$/.exec(weekStr || "");
+  if (!match) return undefined;
+  const year = Number(match[1]);
+  const week = Number(match[2]);
+  const simple = new Date(Date.UTC(year, 0, 1 + (week - 1) * 7));
+  const dayOfWeek = simple.getUTCDay();
+  const isoWeekStart = new Date(simple);
+  const diff = dayOfWeek <= 4 ? 1 - dayOfWeek : 8 - dayOfWeek;
+  isoWeekStart.setUTCDate(simple.getUTCDate() + diff);
+  return isoWeekStart.toISOString().slice(0, 10);
+}
+
 function optionalInputValue(id) {
   const el = $(id);
   if (!el) return undefined;
@@ -16,7 +38,11 @@ function optionalInputValue(id) {
 function setDefaultDates() {
   const today = new Date();
   const iso = today.toISOString().slice(0, 10);
-  $("asOf").value = iso;
+  if ($("asOf")) $("asOf").value = iso;
+  if ($("asOfWeek")) {
+    const week = getISOWeekString(today);
+    $("asOfWeek").value = week;
+  }
 
   // Weekly backtest defaults: last ~8 weeks
   const end = new Date(today);
@@ -271,10 +297,12 @@ function drawDualLineChart(canvas, aDates, aSeries, bDates, bSeries, opts) {
 async function runAgent() {
   $("agentStatus").textContent = "运行中...";
   try {
+    const weekVal = $("asOfWeek") ? $("asOfWeek").value : ( $("asOf") ? $("asOf").value : "" );
+    const weekDate = weekToDate(weekVal) || ( $("asOf") ? $("asOf").value : "" ) || new Date().toISOString().slice(0, 10);
     const body = {
-      target_date: $("asOf").value,
+      target_date: weekDate,
       top_k: Number($("topK").value),
-      min_holdings: Number($("minHoldings").value),
+      min_holdings: 10,
       model_tag: $("modelTag").value,
       provider: optionalInputValue("provider"),
       model_name: optionalInputValue("modelName"),

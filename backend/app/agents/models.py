@@ -140,7 +140,7 @@ class N1NLLM(BaseLLM):
         payload = {
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.2,
+            "temperature": 0.0,
         }
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -154,7 +154,7 @@ class N1NLLM(BaseLLM):
                     f"{self.api_base}/chat/completions",
                     headers=headers,
                     json=payload,
-                    timeout=90.0,
+                    timeout=180.0,
                 )
                 resp.raise_for_status()
                 data = self._parse_json_safe(resp)
@@ -176,8 +176,8 @@ def _make_openai_compatible(base_url: str, api_key: str, model: str) -> BaseChat
         base_url=base_url,
         api_key=api_key,
         model=model,
-        temperature=0.2,
-        timeout=90,
+        temperature=0.0,
+        timeout=180,
     )
 
 
@@ -187,8 +187,8 @@ def _make_ollama(base_url: str, model: str) -> BaseChatModel:
     return ChatOllama(
         base_url=base_url,
         model=model,
-        temperature=0.2,
-        timeout=90,
+        temperature=0.0,
+        timeout=180,
     )
 
 
