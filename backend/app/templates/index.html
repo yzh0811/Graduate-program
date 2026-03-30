@@ -111,17 +111,42 @@
             <input id="wbtBenchmark" type="text" value="sh.510300" />
           </label>
           <label>
-            <span>模型标签 model_tag</span>
+            <span>模型标签 model_tag（可选）</span>
             <select id="wbtModelTag">
               <option value="primary" selected>primary</option>
               <option value="secondary">secondary</option>
             </select>
           </label>
         </div>
+
+        <div class="grid" style="grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 10px;">
+          <label>
+            <span>模型提供商 provider</span>
+            <select id="wbtProvider">
+              <option value="" selected>跟随上方AI选股配置</option>
+              <option value="openai_compatible">openai_compatible</option>
+              <option value="qwen">qwen</option>
+              <option value="kimi">kimi</option>
+              <option value="n1n">n1n</option>
+              <option value="ollama">ollama</option>
+              <option value="mock">mock</option>
+            </select>
+          </label>
+          <label>
+            <span>模型名称 model_name</span>
+            <input id="wbtModelName" type="text" placeholder="跟随上方AI选股配置" />
+          </label>
+          <label>
+            <span>说明</span>
+            <input type="text" value="留空时：周回测使用与上方AI选股相同的provider/model_name" disabled />
+          </label>
+        </div>
+
         <div class="actions">
           <button id="runWeeklyBacktestBtn">📈 开始周度回测（AI vs 基准ETF）</button>
           <span id="wbtStatus" class="status"></span>
         </div>
+        <p id="wbtProgressHint" class="sub" style="margin-top: 8px;"></p>
 
         <div id="weeklyBacktestResult" class="hidden">
           <div class="metrics-grid">

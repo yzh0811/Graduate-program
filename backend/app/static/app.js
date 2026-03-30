@@ -162,12 +162,17 @@ function renderWeeklyBacktestResult(data) {
   $("benchAnnual").textContent = pct(bench.annualized_return);
   $("benchMaxDD").textContent = pct(bench.max_drawdown);
 
+  const aSeries = data.ai_nav_series || [];
+  const aDates = data.ai_nav_dates || [];
+  const bSeries = data.bench_nav_series || [];
+  const bDates = data.bench_nav_dates || [];
+
   drawDualLineChart(
     $("weeklyNavChart"),
-    data.ai_nav_dates || [],
-    data.ai_nav_series || [],
-    data.bench_nav_dates || [],
-    data.bench_nav_series || [],
+    aDates,
+    aSeries,
+    bDates,
+    bSeries,
     {
       aLabel: "AI策略",
       aColor: "#7c5cff",
@@ -335,22 +340,50 @@ async function runBacktest() {
   }
 }
 
+function resolveWeeklyModelConfig() {
+  const provider = optionalInputValue("wbtProvider") || optionalInputValue("provider");
+  const modelName = optionalInputValue("wbtModelName") || optionalInputValue("modelName");
+  return { provider, modelName };
+}
+
+function setWeeklyProgressHint(text) {
+  const el = $("wbtProgressHint");
+  if (el) el.textContent = text || "";
+}
+
 async function runWeeklyBacktest() {
   $("wbtStatus").textContent = "运行中...";
+  setWeeklyProgressHint("正在逐周回测，请稍候（通常在10~60秒，取决于周数与模型响应速度）");
   try {
+    const startDate = $("wbtStart").value;
+    const endDate = $("wbtEnd").value;
+    if (!startDate || !endDate) {
+      throw new Error("请先选择开始/结束日期");
+    }
+    if (startDate > endDate) {
+      throw new Error("开始日期不能晚于结束日期");
+    }
+
+    const { provider, modelName } = resolveWeeklyModelConfig();
     const body = {
-      start_date: $("wbtStart").value,
-      end_date: $("wbtEnd").value,
+      start_date: startDate,
+      end_date: endDate,
       model_tag: $("wbtModelTag").value,
-      provider: optionalInputValue("provider"),
-      model_name: optionalInputValue("modelName"),
+      provider,
+      model_name: modelName,
       benchmark: $("wbtBenchmark").value || "sh.510300",
     };
     const data = await postJson("/api/backtest/weekly", body);
     renderWeeklyBacktestResult(data);
-    $("wbtStatus").textContent = "完成";
+    const summary = `完成（${data.processed_weeks || 0}/${data.total_weeks || 0}周）`;
+    $("wbtStatus").textContent = summary;
+    setWeeklyProgressHint(`已完成：成功 ${data.processed_weeks || 0} 周，失败 ${data.failed_weeks || 0} 周`);
+    if (data.warnings && data.warnings.length) {
+      alert(`周回测提示：\n- ${data.warnings.slice(0, 8).join("\n- ")}`);
+    }
   } catch (e) {
     $("wbtStatus").textContent = "失败";
+    setWeeklyProgressHint("运行失败，请根据报错检查日期范围、模型配置或数据源可用性");
     alert(e.message);
   }
 }
@@ -360,6 +393,13 @@ window.addEventListener("DOMContentLoaded", () => {
   $("runAgentBtn").addEventListener("click", runAgent);
   if ($("runBacktestBtn")) $("runBacktestBtn").addEventListener("click", runBacktest);
   if ($("runWeeklyBacktestBtn")) $("runWeeklyBacktestBtn").addEventListener("click", runWeeklyBacktest);
+
+  if ($("wbtProvider") && $("provider")) {
+    $("wbtProvider").value = "";
+  }
+  if ($("wbtModelName") && $("modelName")) {
+    $("wbtModelName").value = "";
+  }
 
   document.querySelectorAll(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => {

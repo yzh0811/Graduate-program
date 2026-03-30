@@ -100,6 +100,11 @@ def _mock_universe() -> list[dict]:
 
 def _baostock_universe(as_of: str, top_k: int = 10) -> list[dict]:
     """通过 BaoStock 获取候选池（按流动性/市值筛选，避免随机前N）"""
+    cache_key = _cache_key("universe", as_of=as_of, top_k=top_k)
+    cached = _cache_load(cache_key)
+    if cached is not None:
+        return cached.reset_index(drop=True).to_dict(orient="records")
+
     import baostock as bs
     try:
         lg = bs.login()
@@ -169,6 +174,9 @@ def _baostock_universe(as_of: str, top_k: int = 10) -> list[dict]:
         # Debug: 打印排序依据
         for item in top:
             print(f"[DEBUG] universe {item['code']} avg_amount={item.get('avg_amount_20d', 0):.0f}")
+
+        if top:
+            _cache_save(cache_key, pd.DataFrame(top))
 
         return top
     finally:

@@ -85,3 +85,7 @@ class WeeklyBacktestResult(BaseModel):
     bench_nav_series: list[float]
     bench_nav_dates: list[str]
     metrics: dict[str, Any]  # 包含 AI 和基准的对比指标
+    total_weeks: int = 0
+    processed_weeks: int = 0
+    failed_weeks: int = 0
+    warnings: list[str] = Field(default_factory=list)

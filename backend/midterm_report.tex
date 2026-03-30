@@ -1,0 +1,680 @@
+\documentclass[12pt,a4paper]{ctexart}
+\usepackage{geometry}
+\geometry{left=2.5cm,right=2.5cm,top=2.5cm,bottom=2.5cm}
+\usepackage{fontspec}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{titlesec}
+
+% 设置代码样式
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=5pt,
+    backgroundcolor=\color{white},
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    frame=single,
+    tabsize=4,
+    captionpos=b,
+    breaklines=true,
+    breakatwhitespace=true,
+    escapeinside={\%*}{*)},
+    morekeywords={def,class,import,from,as,if,else,elif,for,while,return,None,True,False,self},
+    literate={。}{．}1
+}
+
+% 设置章节格式
+\titleformat{\section}{\centering\Large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{1em}{}
+
+% 设置行距
+\renewcommand{\baselinestretch}{1.5}
+
+% 标题信息
+\title{基于大语言模型的量化交易回测系统\\中期研究报告}
+\author{姓名}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+随着人工智能技术在金融领域的深入应用，基于大语言模型（LLM）的投资决策系统成为量化交易研究的新方向。本项目旨在构建一个完整的AI基金经理工作台，通过模拟基金经理的周度投资流程，实现从市场分析、股票筛选到组合构建的全自动化决策，并借助回测引擎验证策略的有效性。系统采用FastAPI作为后端框架，集成LangGraph实现多步骤决策流程，支持BaoStock、AKShare等多数据源，以及DeepSeek、Qwen、Kimi等多种LLM模型。目前已完成基础架构搭建、AI代理核心、数据层集成、回测引擎及前端界面的开发，初步实现了周度交易策略的回测验证框架。本报告将详细介绍项目的整体设计、实现进展、技术亮点以及后续工作计划。
+
+\textbf{关键词：} 量化交易；大语言模型；回测系统；AI投资决策；FastAPI；LangGraph
+\end{abstract}
+
+\newpage
+
+\tableofcontents
+
+\newpage
+
+\section{引言}
+
+\subsection{研究背景与意义}
+
+传统量化交易策略多依赖于统计学模型与机器学习算法，其在市场极端情况下的适应能力有限。近年来，大语言模型展现出强大的自然语言理解与推理能力，为金融市场的非结构化信息处理提供了新思路。将LLM引入投资决策流程，可以模拟人类基金经理的分析逻辑，结合实时市场数据生成更具解释性的投资组合。
+
+本项目通过构建一个完整的AI驱动的量化交易回测系统，探索LLM在主动投资中的应用潜力，旨在为AI辅助决策提供可复现的实验平台。该系统不仅具备传统回测系统的数据获取与绩效评估功能，还创新性地将LLM作为核心决策引擎，实现从市场分析到投资组合生成的全流程自动化。
+
+\subsection{项目目标}
+
+本项目的主要目标包括：
+
+\begin{enumerate}
+    \item 实现一个基于LLM的自动化投资决策流程，涵盖数据获取、市场分析、股票筛选与权重分配；
+    \item 设计周度交易策略，模拟真实基金的“周一买入、周五卖出”操作模式；
+    \item 集成多数据源与多LLM提供商，支持横向对比与灵活配置；
+    \item 构建完整的回测引擎，提供月度与周度两种回测模式，并与基准ETF进行对比；
+    \item 开发友好的Web界面，降低系统使用门槛，提升交互体验；
+    \item 提供周度报告生成工具，自动化生成投资绩效对比报告。
+\end{enumerate}
+
+\subsection{报告结构}
+
+本报告首先介绍系统整体架构与模块设计，随后详细阐述各模块的实现细节，展示已完成的功能与系统特性，最后总结当前进展并规划后续工作。报告结构如下：
+
+\begin{itemize}
+    \item 第2章：相关工作，介绍量化回测系统与AI在金融决策中的应用现状；
+    \item 第3章：系统总体设计，阐述系统架构、模块划分与技术栈选型；
+    \item 第4章：实现细节，详细介绍各模块的具体实现与关键技术；
+    \item 第5章：已完成工作与系统特性，总结当前实现进展与代码质量；
+    \item 第6章：总结与展望，分析项目创新点并提出后续工作计划。
+\end{itemize}
+
+\section{相关工作}
+
+\subsection{量化交易回测系统}
+
+现有量化回测平台如Zipline、Backtrader等提供了成熟的回测框架，但大多侧重于传统量化策略，缺乏对LLM决策流程的原生支持。此类系统通常需要用户编写复杂的策略代码，对非专业开发者不够友好。此外，现有系统多关注技术指标与统计模型，较少集成自然语言处理能力。
+
+\subsection{AI在金融决策中的应用}
+
+近年来，研究者开始探索LLM在股票预测、财报分析、风险控制等场景的应用。例如，使用GPT系列模型进行新闻情感分析、财报摘要生成等。然而，现有工作多集中在单一任务，缺乏从数据到决策的端到端系统实现。同时，大多数研究侧重于预测准确性，较少关注投资组合构建与风险管理。
+
+\subsection{多智能体与工作流引擎}
+
+LangGraph等图计算框架为构建多步骤决策流程提供了便利。在金融领域，利用智能体协作模拟投研团队的工作模式逐渐成为趋势。本项目借鉴此类思路，设计基于状态机的AI代理工作流，实现决策过程的可控与可解释。
+
+\section{系统总体设计}
+
+\subsection{架构概述}
+
+系统采用分层架构（如图\ref{fig:architecture}所示），分为数据层、AI代理层、回测层、API层与表示层。各层之间通过定义良好的接口通信，确保模块间的松耦合。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{system_architecture.png}
+    \caption{系统分层架构图}
+    \label{fig:architecture}
+\end{figure}
+
+\begin{enumerate}
+    \item \textbf{数据层：}负责市场数据的获取、缓存与预处理，支持BaoStock、AKShare、TuShare及Mock数据源；
+    \item \textbf{AI代理层：}基于LangGraph实现五步决策流程（数据获取→规划→分析→选股→权重分配）；
+    \item \textbf{回测层：}提供月度回测与周度回测两种引擎，计算累计收益、夏普比率、最大回撤等关键指标；
+    \item \textbf{API层：}通过FastAPI暴露RESTful接口，供前端调用；
+    \item \textbf{表示层：}基于HTML/CSS/JavaScript的Web界面，提供配置输入、结果可视化与报告展示。
+\end{enumerate}
+
+\subsection{模块设计}
+
+\subsubsection{数据模块}
+
+\begin{itemize}
+    \item \texttt{providers.py}：抽象数据源接口，实现多数据源的适配与切换；
+    \item \texttt{trading\_calendar.py}：维护交易日历，精确计算周度交易区间（周一至周五）；
+    \item 缓存机制：采用15分钟TTL缓存，减少重复请求，提升响应速度；
+    \item 批量处理：支持分批获取股票数据，避免单次请求超时。
+\end{itemize}
+
+\subsubsection{AI代理模块}
+
+\begin{itemize}
+    \item \texttt{graph.py}：定义LangGraph状态图，管理决策流程的状态转移；
+    \item \texttt{models.py}：工厂模式创建LLM实例，支持多种LLM提供商；
+    \item \texttt{prompts.py}：存放各步骤的提示词模板，确保指令清晰、可复现。
+\end{itemize}
+
+\subsubsection{回测模块}
+
+\begin{itemize}
+    \item \texttt{weekly\_engine.py}：周度回测引擎，模拟每周一开盘买入、周五收盘卖出的操作，并与基准ETF对比；
+    \item \texttt{engine.py}：月度回测引擎，支持传统月度调仓策略；
+    \item \texttt{metrics.py}：计算投资组合的收益指标、风险指标与综合评估指标。
+\end{itemize}
+
+\subsubsection{API模块}
+
+\begin{itemize}
+    \item \texttt{routes.py}：定义三个核心端点：\texttt{/api/agent/run}（运行AI代理）、\texttt{/api/backtest/run}（月度回测）、\texttt{/api/backtest/weekly}（周度回测）；
+    \item \texttt{schemas.py}：基于Pydantic定义请求/响应模型，确保类型安全与自动文档生成。
+\end{itemize}
+
+\subsubsection{前端模块}
+
+\begin{itemize}
+    \item \texttt{index.html}：主页面模板，集成配置表单、图表容器与结果展示区域；
+    \item \texttt{app.js}：处理用户交互、调用后端API、动态更新图表与表格；
+    \item \texttt{styles.css}：提供简洁的样式布局，增强用户体验。
+\end{itemize}
+
+\subsubsection{周度报告工具模块}
+
+\begin{itemize}
+    \item \texttt{weekly\_report.py}：周度报告生成工具，从Excel数据自动生成结构化JSON报告与Markdown可视化报告；
+    \item 功能包括：权重模式识别、收益计算、最大回撤计算、多基金对比、基准对比等。
+\end{itemize}
+
+\subsection{技术栈选型}
+
+\subsubsection{核心依赖}
+
+\begin{table}[H]
+    \centering
+    \caption{核心技术栈}
+    \begin{tabular}{ll}
+        \toprule
+        \textbf{类别} & \textbf{技术选型} \\
+        \midrule
+        后端框架 & FastAPI (>=0.115.0) + Uvicorn \\
+        数据验证 & Pydantic (>=2.7.0) + Pydantic-settings \\
+        AI/LLM框架 & LangChain (>=0.2.14) + LangGraph (>=0.2.35) \\
+        数据处理 & Pandas (>=2.2.2) + NumPy (>=1.26.4) \\
+        数据源 & BaoStock (>=0.8.8) + AKShare (>=1.14.0) + TuShare (>=1.4.16) \\
+        LLM提供商 & LangChain-OpenAI + LangChain-Ollama \\
+        环境管理 & Python-dotenv (>=1.0.1) \\
+        模板引擎 & Jinja2 (>=3.1.4) \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsubsection{支持的LLM提供商}
+
+系统支持多种LLM提供商，通过统一接口适配：
+
+\begin{enumerate}
+    \item \textbf{OpenAI兼容：} DeepSeek、SiliconFlow等；
+    \item \textbf{阿里通义千问 (Qwen)：} 通过DashScope API；
+    \item \textbf{月之暗面Kimi：} Moonshot API；
+    \item \textbf{N1N聚合网关：} 支持多种模型；
+    \item \textbf{Ollama本地部署：} 支持本地模型；
+    \item \textbf{Mock模式：} 用于开发和测试。
+\end{enumerate}
+
+\subsubsection{支持的数据源}
+
+\begin{enumerate}
+    \item \textbf{BaoStock：} 免费A股数据（主要使用）；
+    \item \textbf{AKShare：} 开源金融数据；
+    \item \textbf{TuShare：} 专业金融数据（需要Token）；
+    \item \textbf{Mock模式：} 模拟数据用于测试。
+\end{enumerate}
+
+\section{实现细节}
+
+\subsection{数据获取与缓存}
+
+数据源适配器遵循统一接口\texttt{DataProvider}，提供\texttt{get\_stock\_price}等方法。缓存使用内存字典，键为数据参数哈希，值为（时间戳，数据）元组，过期自动清理。交易日历基于实际交易日期，排除节假日与周末，确保周度区间的准确性。
+
+缓存实现的关键代码片段：
+
+\begin{lstlisting}[language=Python, caption=缓存机制实现]
+_CACHE_TTL_SECONDS = 15 * 60  # 15分钟TTL
+
+def _cache_load(key: str) -> pd.DataFrame | None:
+    path = _cache_path(key)
+    if not path.exists():
+        return None
+    age = datetime.now().timestamp() - path.stat().st_mtime
+    if age > _CACHE_TTL_SECONDS:  # 过期检查
+        return None
+    # 加载缓存数据...
+\end{lstlisting}
+
+\subsection{AI代理决策流程}
+
+决策流程通过LangGraph状态机实现（如图\ref{fig:workflow}所示），包含五个节点：
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{agent_workflow.png}
+    \caption{AI代理五步决策流程}
+    \label{fig:workflow}
+\end{figure}
+
+\begin{enumerate}
+    \item \textbf{fetch\_data：}获取指定日期的市场快照与候选股票池（如沪深300成分股）；
+    \item \textbf{plan：}LLM根据市场状况制定投资计划（如行业侧重、风险偏好）；
+    \item \textbf{analyze：}深入分析个股的技术指标（20日收益率、波动率、最大回撤）；
+    \item \textbf{select：}筛选出5-10只最具潜力的股票；
+    \item \textbf{weight：}分配投资权重，生成最终组合。
+\end{enumerate}
+
+每个节点的执行结果存入状态字典，供后续节点使用。流程可配置中断点，便于调试与步骤验证。
+
+\subsection{周度回测引擎}
+
+周度回测模拟真实基金操作：
+\begin{itemize}
+    \item 每周一开盘按AI代理生成的组合买入；
+    \item 持有至周五收盘卖出，计算周度收益；
+    \item 同时计算基准ETF（如510300.SH）的同周期收益；
+    \item 累计多周收益，绘制净值曲线，计算超额收益、信息比率等指标。
+\end{itemize}
+
+回测引擎支持手续费、滑点等参数配置，增强现实性。
+
+\subsection{周度报告生成工具}
+
+\texttt{weekly\_report.py}脚本提供自动化报告生成功能，主要特性包括：
+
+\begin{enumerate}
+    \item \textbf{数据规范化：}统一列名格式，处理中英文括号与横线差异；
+    \item \textbf{权重模式识别：}自动识别Excel中的权重列，支持加权与等权两种模式；
+    \item \textbf{收益计算：}支持从净值序列或日收益率序列计算周度收益；
+    \item \textbf{风险指标计算：}计算最大回撤、波动率等风险指标；
+    \item \textbf{多基金对比：}支持多只公募基金与模型组合的横向对比；
+    \item \textbf{结构化输出：}生成JSON结构化数据与Markdown可视化报告；
+    \item \textbf{诊断功能：}提供收益贡献诊断，分析各股票对组合收益的贡献度。
+\end{enumerate}
+
+关键功能代码示例：
+
+\begin{lstlisting}[language=Python, caption=周度报告生成核心函数]
+def build_weekly_report(excel_path: str, output_excel: str = "周度对比结果_完整版.xlsx") -> tuple[dict, str]:
+    # 读取并规范化数据
+    df = pd.read_excel(excel_path)
+    df.columns = [_normalize_col(c) for c in df.columns]
+
+    # 识别模型组合列
+    model_stock_cols = [col for col in df.columns if "模型组合" in col and "涨跌幅" in col]
+
+    # 自动识别权重模式
+    weights_map, weight_mode = _detect_model_weights(df, model_stock_cols)
+
+    # 计算组合日收益
+    df["模型组合-日收益"] = df[model_stock_cols].apply(
+        lambda x: sum((x[c] if pd.notna(x[c]) else 0.0) * weights_map.get(c, 0.0)
+                      for c in model_stock_cols),
+        axis=1,
+    )
+
+    # 计算周收益与最大回撤
+    model_weekly_return = _weekly_return_from_daily_returns(df["模型组合-日收益"])
+    model_max_drawdown = _max_drawdown_from_returns(df["模型组合-日收益"])
+
+    # 生成结构化报告与Markdown报告
+    # ...
+\end{lstlisting}
+
+\subsection{前端交互实现}
+
+前端通过Fetch API与后端通信，采用异步更新避免页面阻塞。图表使用Chart.js动态绘制净值对比曲线。界面分为三个标签页：
+
+\begin{enumerate}
+    \item \textbf{配置：}日期选择、模型选择、参数设置；
+    \item \textbf{决策时间线：}展示AI代理各步骤的中间结果；
+    \item \textbf{回测结果：}展示净值曲线、绩效指标与详细交易记录。
+\end{enumerate}
+
+\subsection{配置与扩展性}
+
+系统通过\texttt{.env}文件管理敏感配置（如API密钥），通过\texttt{config.py}集中管理应用配置。LLM提供商与数据源均采用工厂模式，新增提供商只需实现相应接口并在配置中注册。
+
+配置管理示例：
+
+\begin{lstlisting}[language=Python, caption=系统配置管理]
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    app_name: str = "AI Agent Portfolio Recommender"
+    log_level: str = "INFO"
+
+    # LLM配置
+    llm_provider: str = "mock"  # mock | openai_compatible | ollama | qwen | kimi | n1n
+    openai_base_url: str | None = None
+    openai_api_key: str | None = None
+    openai_model: str = "deepseek-chat"
+
+    # 数据源配置
+    data_provider: str = "mock"  # mock | baostock | akshare | tushare
+    tushare_token: str | None = None
+\end{lstlisting}
+
+\section{已完成工作与系统特性}
+
+\subsection{已完成功能}
+
+\begin{enumerate}
+    \item \textbf{基础架构：}完整的FastAPI后端，模块化代码结构，类型提示全覆盖；
+    \item \textbf{数据层：}BaoStock数据源完整集成，缓存机制有效运行，支持批量处理；
+    \item \textbf{AI代理：}五步决策流程可稳定执行，支持6种LLM提供商，包含回退机制；
+    \item \textbf{回测引擎：}月度与周度回测均可正常运行，指标计算准确；
+    \item \textbf{周度报告工具：}完整的报告生成流水线，支持多基金对比与可视化输出；
+    \item \textbf{前端界面：}Web界面功能完整，操作流畅，支持多标签查看；
+    \item \textbf{部署与运行：}提供一键启动脚本（\texttt{run.ps1}），环境配置简单。
+\end{enumerate}
+
+\subsection{代码质量与维护性}
+
+\begin{enumerate}
+    \item \textbf{类型安全：}全面使用Python类型提示，提高代码可靠性；
+    \item \textbf{错误处理：}完善的异常处理和降级机制（如数据源失败时切换Mock）；
+    \item \textbf{代码规范：}遵循PEP 8规范，结构清晰，关键函数与类均有文档注释；
+    \item \textbf{配置管理：}使用Pydantic-settings进行类型安全的配置管理；
+    \item \textbf{日志系统：}详细记录运行信息，便于调试与监控。
+\end{enumerate}
+
+\subsection{系统特性}
+
+\subsubsection{架构设计优势}
+
+\begin{enumerate}
+    \item \textbf{分层架构：}清晰的API层、业务逻辑层、数据层分离；
+    \item \textbf{依赖注入：}通过配置灵活切换数据源和LLM提供商；
+    \item \textbf{模块化设计：}各功能模块高度独立，便于维护和扩展；
+    \item \textbf{状态管理：}使用LangGraph进行状态管理，流程清晰；
+    \item \textbf{缓存策略：}智能缓存减少外部API调用，提升性能。
+\end{enumerate}
+
+\subsubsection{可扩展性}
+
+\begin{enumerate}
+    \item \textbf{插件化数据源：}易于添加新的数据源提供商；
+    \item \textbf{多模型支持：}框架支持任意OpenAI兼容的LLM；
+    \item \textbf{策略扩展：}可轻松添加新的投资策略或调整现有策略；
+    \item \textbf{指标扩展：}回测指标计算模块化，易于添加新指标；
+    \item \textbf{前端可扩展：}基于现代Web技术，易于添加新功能。
+\end{enumerate}
+
+\subsubsection{设计模式应用}
+
+\begin{enumerate}
+    \item \textbf{策略模式：}数据源和LLM提供商的选择；
+    \item \textbf{工厂模式：}LLM实例的创建；
+    \item \textbf{模板方法：}回测流程的固定步骤；
+    \item \textbf{观察者模式：}前端状态更新；
+    \item \textbf{装饰器模式：}缓存功能的实现。
+\end{enumerate}
+
+\subsection{最近更新（基于git状态）}
+
+\begin{enumerate}
+    \item \textbf{API模式更新（\texttt{app/api/schemas.py}）：}优化请求和响应数据结构，增强接口稳定性；
+    \item \textbf{周度回测增强（\texttt{app/backtest/weekly\_engine.py}）：}改进周度回测逻辑，修正交易日识别边界问题；
+    \item \textbf{数据提供者优化（\texttt{app/data/providers.py}）：}增强数据获取和缓存，增加分批获取机制；
+    \item \textbf{交易日历改进（\texttt{app/data/trading\_calendar.py}）：}优化交易日识别，提高准确性；
+    \item \textbf{前端界面更新（\texttt{app/static/app.js}, \texttt{app/templates/index.html}）：}改进用户体验，增加加载状态提示。
+\end{enumerate}
+
+\subsection{待完成/优化部分}
+
+\begin{enumerate}
+    \item \textbf{更多数据源：}AKShare和TuShare的完整集成；
+    \item \textbf{高级风控：}更复杂的风险控制机制（如VaR、CVaR计算）；
+    \item \textbf{性能优化：}大规模回测的并行计算支持；
+    \item \textbf{报告生成增强：}更多可视化图表与交互式报告；
+    \item \textbf{单元测试：}增加测试覆盖率，确保代码质量；
+    \item \textbf{用户管理：}多用户支持与权限管理。
+\end{enumerate}
+
+\section{总结与展望}
+
+\subsection{当前进展总结}
+
+本项目已成功实现了一个功能完整的AI驱动的量化交易回测系统。系统架构清晰，模块耦合度低，具备良好的可扩展性与可维护性。核心的AI代理决策流程、多数据源支持、双模式回测引擎、周度报告工具均已实现，并通过Web界面提供了友好的交互方式。代码质量较高，类型安全与错误处理较为完善。
+
+项目的主要成果包括：
+\begin{enumerate}
+    \item 构建了基于LangGraph的AI代理决策工作流，实现五步投资决策流程；
+    \item 实现了周度交易策略回测引擎，模拟真实基金操作模式；
+    \item 开发了自动化周度报告生成工具，支持多基金对比与可视化输出；
+    \item 设计了灵活可扩展的架构，支持多种LLM提供商与数据源；
+    \item 提供了完整的Web前端，降低系统使用门槛。
+\end{enumerate}
+
+\subsection{项目创新点}
+
+\begin{enumerate}
+    \item \textbf{端到端的AI投资决策流程：}将LLM深度融入从数据到组合的全过程，实现自动化决策；
+    \item \textbf{周度基金模拟：}更贴近实际基金操作模式，增强实践价值；
+    \item \textbf{多模型横向对比框架：}为LLM在金融决策中的评估提供标准化平台；
+    \item \textbf{自动化报告生成：}集成周度报告工具，实现从数据到报告的自动化流水线；
+    \item \textbf{开源与可复现：}代码开源，方便后续研究与改进。
+\end{enumerate}
+
+\subsection{后续工作计划}
+
+\subsubsection{功能增强}
+
+\begin{enumerate}
+    \item \textbf{数据源扩展：}完整集成AKShare、TuShare数据源，增加宏观经济指标；
+    \item \textbf{风控模块增强：}引入更复杂的风险控制机制（VaR、CVaR、压力测试）；
+    \item \textbf{策略参数优化：}实现策略参数优化与超参数调优功能；
+    \item \textbf{实时数据支持：}增加实时数据流支持，实现近实时决策。
+\end{enumerate}
+
+\subsubsection{性能优化}
+
+\begin{enumerate}
+    \item \textbf{并行计算：}支持大规模回测的并行计算，提升处理速度；
+    \item \textbf{缓存优化：}优化缓存策略，减少磁盘I/O，提升响应速度；
+    \item \textbf{前端性能：}优化前端图表渲染性能，支持大数据量展示。
+\end{enumerate}
+
+\subsubsection{实验与评估}
+
+\begin{enumerate}
+    \item \textbf{对照实验设计：}系统比较不同LLM模型、不同提示词模板的效果；
+    \item \textbf{长期回测验证：}延长回测周期，验证策略在不同市场环境下的稳健性；
+    \item \textbf{基准扩展：}引入更多基准对比（如行业指数、主动基金）。
+\end{enumerate}
+
+\subsubsection{部署与文档}
+
+\begin{enumerate}
+    \item \textbf{容器化部署：}提供Docker容器化部署方案，简化部署流程；
+    \item \textbf{完整文档：}编写用户手册、开发文档与API文档；
+    \item \textbf{测试覆盖率：}增加单元测试与集成测试覆盖率，确保代码质量；
+    \item \textbf{监控与日志：}增强系统监控与日志分析功能。
+\end{enumerate}
+
+\subsection{项目意义}
+
+本系统为AI在量化投资领域的应用提供了一个可操作、可验证的实验平台，既可作为学术研究工具，也可为实际投资提供参考。通过将大语言模型与传统量化方法相结合，项目探索了AI在复杂金融决策中的应用潜力，为智能投顾、量化投资等领域提供了新的技术思路。
+
+系统具备以下应用价值：
+\begin{enumerate}
+    \item \textbf{学术研究：}为AI在金融决策中的研究提供标准化实验平台；
+    \item \textbf{教育实践：}作为金融科技相关课程的教学案例；
+    \item \textbf{投资参考：}为投资机构提供AI辅助决策工具；
+    \item \textbf{技术验证：}验证不同LLM在金融场景下的表现差异。
+\end{enumerate}
+
+\section*{参考文献}
+
+\begin{enumerate}
+    \item Brown T B, et al. Language Models are Few-Shot Learners. NeurIPS 2020.
+    \item Liu Y, et al. FinGPT: Open-Source Financial Large Language Models. 2023.
+    \item LangChain Documentation. \url{https://python.langchain.com/}
+    \item BaoStock Data API. \url{http://baostock.com/}
+    \item FastAPI Documentation. \url{https://fastapi.tiangolo.com/}
+    \item Pandas Documentation. \url{https://pandas.pydata.org/}
+    \item LangGraph Documentation. \url{https://langchain-ai.github.io/langgraph/}
+\end{enumerate}
+
+\newpage
+
+\appendix
+\section{项目文件结构}
+
+\subsection{核心文件路径}
+
+\begin{itemize}
+    \item 主应用入口：\texttt{D:\textbackslash 毕设\textbackslash Graduate-program\textbackslash backend\textbackslash app\textbackslash main.py}
+    \item 配置管理：\texttt{D:\textbackslash 毕设\textbackslash Graduate-program\textbackslash backend\textbackslash app\textbackslash core\textbackslash config.py}
+    \item AI决策图：\texttt{D:\textbackslash 毕设\textbackslash Graduate-program\textbackslash backend\textbackslash app\textbackslash agents\textbackslash graph.py}
+    \item 数据提供者：\texttt{D:\textbackslash 毕设\textbackslash Graduate-program\textbackslash backend\textbackslash app\textbackslash data\textbackslash providers.py}
+    \item 周度回测引擎：\texttt{D:\textbackslash 毕设\textbackslash Graduate-program\textbackslash backend\textbackslash app\textbackslash backtest\textbackslash weekly\_engine.py}
+    \item API路由：\texttt{D:\textbackslash 毕设\textbackslash Graduate-program\textbackslash backend\textbackslash app\textbackslash api\textbackslash routes.py}
+    \item 周度报告工具：\texttt{D:\textbackslash 毕设\textbackslash Graduate-program\textbackslash backend\textbackslash tools\textbackslash weekly\_report.py}
+    \item 前端模板：\texttt{D:\textbackslash 毕设\textbackslash Graduate-program\textbackslash backend\textbackslash app\textbackslash templates\textbackslash index.html}
+    \item 依赖配置：\texttt{D:\textbackslash 毕设\textbackslash Graduate-program\textbackslash backend\textbackslash requirements.txt}
+    \item 环境配置：\texttt{D:\textbackslash 毕设\textbackslash Graduate-program\textbackslash backend\textbackslash .env}
+\end{itemize}
+
+\subsection{目录结构概览}
+
+\begin{verbatim}
+backend/
+├── app/                    # 主应用目录
+│   ├── api/               # API接口层
+│   │   ├── routes.py      # API路由定义
+│   │   └── schemas.py     # Pydantic数据模型
+│   ├── agents/            # AI代理模块
+│   │   ├── graph.py       # LangGraph决策流程
+│   │   ├── models.py      # LLM模型管理
+│   │   └── prompts.py     # 提示词模板
+│   ├── backtest/          # 回测引擎
+│   │   ├── engine.py      # 月度回测引擎
+│   │   ├── weekly_engine.py # 周度回测引擎
+│   │   └── metrics.py     # 回测指标计算
+│   ├── data/              # 数据模块
+│   │   ├── providers.py   # 数据源提供者
+│   │   └── trading_calendar.py # 交易日历
+│   ├── core/              # 核心配置
+│   │   ├── config.py      # 应用配置
+│   │   └── logging.py     # 日志配置
+│   ├── static/            # 静态文件
+│   │   ├── app.js         # 前端JavaScript
+│   │   └── styles.css     # 前端样式
+│   ├── templates/         # 模板文件
+│   │   └── index.html     # 主页面模板
+│   └── main.py            # FastAPI应用入口
+├── tools/                 # 工具脚本
+│   └── weekly_report.py   # 周度报告生成工具
+├── .env                   # 环境变量配置
+├── requirements.txt       # Python依赖
+└── run.ps1               # 启动脚本
+\end{verbatim}
+
+\section{核心API接口}
+
+\subsection{API端点列表}
+
+\begin{table}[H]
+    \centering
+    \caption{系统核心API接口}
+    \begin{tabular}{lllp{0.4\textwidth}}
+        \toprule
+        \textbf{端点} & \textbf{方法} & \textbf{描述} & \textbf{主要参数} \\
+        \midrule
+        \texttt{/api/health} & GET & 健康检查 & 无 \\
+        \texttt{/api/agent/run} & POST & 运行AI代理生成投资组合 & \texttt{target\_date, top\_k, min\_holdings, model\_tag} \\
+        \texttt{/api/backtest/run} & POST & 执行月度回测 & \texttt{start\_date, end\_date, holdings} \\
+        \texttt{/api/backtest/weekly} & POST & 执行周度回测 & \texttt{start\_date, end\_date, holdings} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{API调用示例}
+
+\begin{lstlisting}[language=Python, caption=API调用示例]
+import requests
+
+# 运行AI代理
+response = requests.post(
+    "http://localhost:8000/api/agent/run",
+    json={
+        "target_date": "2024-03-25",
+        "top_k": 300,
+        "min_holdings": 10,
+        "model_tag": "primary"
+    }
+)
+
+# 执行周度回测
+response = requests.post(
+    "http://localhost:8000/api/backtest/weekly",
+    json={
+        "start_date": "2024-01-01",
+        "end_date": "2024-03-31",
+        "holdings": [
+            {"code": "sh.600519", "weight": 0.1},
+            {"code": "sz.300750", "weight": 0.15},
+            # ... 其他持仓
+        ]
+    }
+)
+\end{lstlisting}
+
+\section{系统配置说明}
+
+\subsection{环境变量配置}
+
+系统通过\texttt{.env}文件进行配置，主要配置项包括：
+
+\begin{lstlisting}[caption=环境变量配置示例]
+# 应用配置
+APP_NAME="AI Agent Portfolio Recommender"
+LOG_LEVEL="INFO"
+
+# LLM配置
+LLM_PROVIDER="openai_compatible"  # mock | openai_compatible | ollama | qwen | kimi | n1n
+OPENAI_BASE_URL="https://api.deepseek.com/v1"
+OPENAI_API_KEY="your_api_key_here"
+OPENAI_MODEL="deepseek-chat"
+
+# 数据源配置
+DATA_PROVIDER="baostock"  # mock | baostock | akshare | tushare
+TUSHARE_TOKEN="your_tushare_token"  # 可选
+\end{lstlisting}
+
+\subsection{启动与运行}
+
+系统提供一键启动脚本\texttt{run.ps1}（Windows PowerShell）：
+
+\begin{lstlisting}[language=bash, caption=系统启动脚本]
+# run.ps1
+$env:PYTHONPATH = "$PWD"
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+\end{lstlisting}
+
+启动命令：
+\begin{verbatim}
+.\run.ps1
+\end{verbatim}
+
+\end{document}
+\end{lstlisting}
+\end{document}
+\end{verbatim}
+\end{document}
+\end{lstlisting}
+\end{document}
