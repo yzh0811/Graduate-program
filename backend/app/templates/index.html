@@ -137,8 +137,28 @@
             <input id="wbtModelName" type="text" placeholder="跟随上方AI选股配置" />
           </label>
           <label>
-            <span>说明</span>
-            <input type="text" value="留空时：周回测使用与上方AI选股相同的provider/model_name" disabled />
+            <span>收益口径 price_mode</span>
+            <select id="wbtPriceMode">
+              <option value="open_close" selected>open_close（周一开盘→周五收盘）</option>
+              <option value="close_close">close_close（周一收盘→周五收盘）</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="grid" style="grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 10px;">
+          <label>
+            <span>对齐模式</span>
+            <select id="wbtAlignMode">
+              <option value="false" selected>关闭（每周重新生成组合）</option>
+              <option value="true">开启（固定首周持仓 + close_close）</option>
+            </select>
+          </label>
+          <label>
+            <span>固定持仓</span>
+            <select id="wbtFixedPortfolio">
+              <option value="false" selected>关闭</option>
+              <option value="true">开启（全区间复用首周组合）</option>
+            </select>
           </label>
         </div>
 

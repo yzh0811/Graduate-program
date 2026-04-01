@@ -355,7 +355,11 @@ def _to_baostock_code(code: str) -> str:
     digits = "".join(ch for ch in c if ch.isdigit())
     if len(digits) >= 6:
         digits = digits[:6]
-    if digits.startswith("6"):
+
+    # A股/ETF 简单路由：
+    # - 上交所常见：5xxxxxx(ETF), 6xxxxxx(股票), 9xxxxxx(B股)
+    # - 深交所常见：0/1/2/3 开头
+    if digits.startswith(("5", "6", "9")):
         return f"sh.{digits}"
     return f"sz.{digits}"
 

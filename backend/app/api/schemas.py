@@ -77,6 +77,9 @@ class WeeklyBacktestRequest(BaseModel):
     provider: str | None = Field(None, description="可选：指定回测时使用的模型提供商。")
     model_name: str | None = Field(None, description="可选：指定回测时使用的模型名称。")
     benchmark: str = Field("sh.510300", description="对比基准代码，默认沪深300ETF。")
+    align_mode: bool = Field(False, description="是否启用对齐模式（固定持仓 + close-close口径）。")
+    use_fixed_portfolio: bool = Field(False, description="是否在整个回测区间复用第一周AI持仓。")
+    price_mode: str = Field("open_close", description="收益口径：open_close 或 close_close。")
 
 
 class WeeklyBacktestResult(BaseModel):

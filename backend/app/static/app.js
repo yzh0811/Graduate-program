@@ -365,6 +365,8 @@ async function runWeeklyBacktest() {
     }
 
     const { provider, modelName } = resolveWeeklyModelConfig();
+    const alignMode = $("wbtAlignMode")?.value === "true";
+    const fixedPortfolio = $("wbtFixedPortfolio")?.value === "true";
     const body = {
       start_date: startDate,
       end_date: endDate,
@@ -372,6 +374,9 @@ async function runWeeklyBacktest() {
       provider,
       model_name: modelName,
       benchmark: $("wbtBenchmark").value || "sh.510300",
+      align_mode: alignMode,
+      use_fixed_portfolio: fixedPortfolio,
+      price_mode: $("wbtPriceMode")?.value || "open_close",
     };
     const data = await postJson("/api/backtest/weekly", body);
     renderWeeklyBacktestResult(data);
@@ -399,6 +404,15 @@ window.addEventListener("DOMContentLoaded", () => {
   }
   if ($("wbtModelName") && $("modelName")) {
     $("wbtModelName").value = "";
+  }
+  if ($("wbtPriceMode")) {
+    $("wbtPriceMode").value = "open_close";
+  }
+  if ($("wbtAlignMode")) {
+    $("wbtAlignMode").value = "false";
+  }
+  if ($("wbtFixedPortfolio")) {
+    $("wbtFixedPortfolio").value = "false";
   }
 
   document.querySelectorAll(".tab-btn").forEach(btn => {
